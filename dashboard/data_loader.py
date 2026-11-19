@@ -1,0 +1,331 @@
+﻿from pathlib import Path
+import pandas as pd
+import streamlit as st
+import logging
+
+LOGGER = logging.getLogger(__name__)
+
+
+# =========================================================
+# Rutas principales del proyecto
+# =========================================================
+ROOT = Path(__file__).resolve().parents[1]
+
+DATA_SURVEY = ROOT / "data" / "processed" / "encuestas" / "model_ready.csv"
+
+NEWS_CASES = {
+    "case1_es": ROOT / "outputs" / "text_analysis" / "case1_es" / "news_sentiment_scored.csv",
+    "case2_en": ROOT / "outputs" / "text_analysis" / "case2_en" / "news_sentiment_scored.csv",
+    "case3_ec_media": ROOT / "outputs" / "text_analysis" / "case3_ec_media" / "news_sentiment_scored.csv",
+}
+
+SOCIAL_SENTIMENT_PATH = ROOT / "outputs" / "text_analysis" / "social_x" / "social_sentiment_scored.csv"
+
+METRICS_DIR = ROOT / "outputs" / "latest" / "tables"
+
+SURVEY_PUBLIC = ROOT / "backend" / "public" / "surveys"
+
+RISK_INDEX_BY_AGE = SURVEY_PUBLIC / "tables" / "risk_index_by_age.csv"
+DEEPFAKE_DISTRUST_BY_AGE = SURVEY_PUBLIC / "tables" / "deepfake_distrust_by_age.csv"
+EXPOSURE_INDEX_BY_AGE = SURVEY_PUBLIC / "tables" / "exposure_index_by_age.csv"
+EXPOSURE_INDEX_BY_AGE_ROBUST = SURVEY_PUBLIC / "tables" / "exposure_index_by_age_robust.csv"
+
+H1_SPEARMAN_SENSITIVITY = (
+    METRICS_DIR / "h1_spearman_sensitivity.csv"
+)
+# =========================================================
+# Artefactos técnicos para trazabilidad del dashboard
+# =========================================================
+
+DATA_QUALITY_REPORT = METRICS_DIR / "data_quality_report.csv"
+VARIABLE_DICTIONARY = METRICS_DIR / "variable_dictionary.csv"
+CONSTRUCT_MAP = METRICS_DIR / "construct_map.csv"
+TRIANGULATION_MATRIX = METRICS_DIR / "triangulation_matrix.csv"
+RECOMMENDATION_RULES = METRICS_DIR / "recommendation_rules.csv"
+
+MODEL_COMPARISON = METRICS_DIR / "model_comparison_summary.csv"
+
+
+MODEL_METRICS_SUMMARY = METRICS_DIR / "model_metrics_summary.csv"
+MODEL_METRICS_BY_SEED = METRICS_DIR / "model_metrics_by_seed_dashboard.csv"
+CONFUSION_MATRIX_3 = METRICS_DIR / "confusion_matrix_3_levels.csv"
+CONFUSION_MATRIX_5 = METRICS_DIR / "confusion_matrix_5_levels.csv"
+FEATURE_IMPORTANCE = METRICS_DIR / "feature_importance_latest.csv"
+MODEL_INTERPRETATION = METRICS_DIR / "model_interpretation_rules.csv"
+SIMULATOR_SCHEMA = METRICS_DIR / "simulator_feature_schema.csv"
+
+
+# =========================================================
+# Lectura segura
+# =========================================================
+
+def read_csv_safe(path: Path) -> pd.DataFrame:
+    if not path.exists():
+        return pd.DataFrame()
+
+    try:
+        try:
+            return pd.read_csv(path, encoding="utf-8-sig")
+        except UnicodeDecodeError:
+            return pd.read_csv(path, encoding="latin1")
+    except (OSError, pd.errors.EmptyDataError, pd.errors.ParserError):
+        LOGGER.exception("No se pudo leer el artefacto %s", path.name)
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def load_model_metrics_summary() -> pd.DataFrame:
+    data = read_csv_safe(MODEL_METRICS_SUMMARY)
+    required = {"Modelo", "Configuración", "F1_ponderado"}
+    if not data.empty and not required.issubset(data.columns):
+        LOGGER.error("Columnas faltantes en %s: %s", MODEL_METRICS_SUMMARY.name,
+                     sorted(required - set(data.columns)))
+        return pd.DataFrame()
+    return data
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def load_model_metrics_by_seed_dashboard() -> pd.DataFrame:
+    return read_csv_safe(MODEL_METRICS_BY_SEED)
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def load_confusion_matrix_3_levels() -> pd.DataFrame:
+    return read_csv_safe(CONFUSION_MATRIX_3)
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def load_confusion_matrix_5_levels() -> pd.DataFrame:
+    return read_csv_safe(CONFUSION_MATRIX_5)
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def load_feature_importance() -> pd.DataFrame:
+    return read_csv_safe(FEATURE_IMPORTANCE)
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def load_model_interpretation_rules() -> pd.DataFrame:
+    return read_csv_safe(MODEL_INTERPRETATION)
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def load_simulator_feature_schema() -> pd.DataFrame:
+    return read_csv_safe(SIMULATOR_SCHEMA)
+
+
+# =========================================================
+# Encuestas
+# =========================================================
+
+@st.cache_data(ttl=600)
+def load_survey() -> pd.DataFrame:
+    return read_csv_safe(DATA_SURVEY)
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def load_h1_spearman_sensitivity() -> pd.DataFrame:
+    """
+    Carga la comparación entre el índice completo y reducido de H1.
+    """
+    df = read_csv_safe(H1_SPEARMAN_SENSITIVITY)
+
+    if df.empty:
+        return pd.DataFrame()
+
+    required_columns = {
+        "scenario",
+        "n_items",
+        "n",
+        "rho",
+        "p_value",
+        "ci95_low",
+        "ci95_high",
+        "index_concordance",
+        "delta_rho",
+    }
+
+    if not required_columns.issubset(df.columns):
+        return pd.DataFrame()
+
+    numeric_columns = [
+        "n_items",
+        "n",
+        "rho",
+        "p_value",
+        "ci95_low",
+        "ci95_high",
+        "index_concordance",
+        "delta_rho",
+    ]
+
+    for column in numeric_columns:
+        df[column] = pd.to_numeric(
+            df[column],
+            errors="coerce",
+        )
+
+    return df.dropna(
+        subset=[
+            "scenario",
+            "n",
+            "rho",
+            "p_value",
+            "ci95_low",
+            "ci95_high",
+        ]
+    )
+# =========================================================
+# Evidencia digital / GDELT
+# =========================================================
+@st.cache_data(ttl=600, show_spinner=False)
+def load_news_cases() -> pd.DataFrame:
+    frames = []
+
+    def _normalize_sentiment_label(value):
+        value = str(value or "").strip().lower()
+
+        mapping = {
+            "positive": "Positivo",
+            "positivo": "Positivo",
+            "pos": "Positivo",
+            "neutral": "Neutral",
+            "neu": "Neutral",
+            "negative": "Negativo",
+            "negativo": "Negativo",
+            "neg": "Negativo",
+        }
+
+        return mapping.get(value, "No clasificado")
+
+    def _read_file(path: Path, case_id: str, corpus_type: str) -> pd.DataFrame:
+        df = read_csv_safe(path)
+
+        df["case_id"] = case_id
+        df["corpus_type"] = corpus_type
+
+        # Normalización de columnas entre GDELT y redes
+        if "source" not in df.columns and "domain" in df.columns:
+            df["source"] = df["domain"]
+
+        if "source" not in df.columns and "platform" in df.columns:
+            df["source"] = df["platform"]
+
+        if "text" not in df.columns and "content" in df.columns:
+            df["text"] = df["content"]
+
+        if "url" not in df.columns and "source_url" in df.columns:
+            df["url"] = df["source_url"]
+
+        if "date" not in df.columns and "published_at" in df.columns:
+            df["date"] = df["published_at"]
+
+        if "platform" not in df.columns:
+            df["platform"] = "news_gdelt" if corpus_type == "news_gdelt" else "social_media"
+
+        if "sentiment_label" not in df.columns:
+            df["sentiment_label"] = pd.NA
+
+        if "sentiment_score" not in df.columns:
+            df["sentiment_score"] = pd.NA
+
+        df["sentiment_label_std"] = df["sentiment_label"].apply(_normalize_sentiment_label)
+        df["sentiment_score"] = pd.to_numeric(df["sentiment_score"], errors="coerce")
+
+        if "date" in df.columns:
+            df["date"] = pd.to_datetime(df["date"], errors="coerce", utc=True).dt.tz_localize(None)
+
+        # Asegurar columnas mínimas para el dashboard
+        required_cols = [
+            "case_id", "corpus_type", "platform", "source", "url",
+            "date", "title", "text", "sentiment_label",
+            "sentiment_label_std", "sentiment_score"
+        ]
+
+        for col in required_cols:
+            if col not in df.columns:
+                df[col] = pd.NA
+
+        return df
+
+    for case_id, path in NEWS_CASES.items():
+        if path.exists():
+            frames.append(_read_file(path, case_id, "news_gdelt"))
+
+    if SOCIAL_SENTIMENT_PATH.exists():
+        social = _read_file(SOCIAL_SENTIMENT_PATH, "tiktok", "social_media")
+        dates = pd.to_datetime(social["date"], errors="coerce", utc=True)
+        academic_scope = (
+            social["platform"].astype("string").str.casefold().eq("tiktok")
+            & dates.between("2025-02-01", "2025-05-01", inclusive="left")
+        )
+        frames.append(social.loc[academic_scope].copy())
+
+    if not frames:
+        return pd.DataFrame()
+
+    return pd.concat(frames, ignore_index=True, sort=False)  
+
+
+# =========================================================
+# Métricas de modelado
+# =========================================================
+
+@st.cache_data(ttl=600)
+def load_model_comparison_summary() -> pd.DataFrame:
+    return read_csv_safe(MODEL_COMPARISON)
+
+
+# =========================================================
+# Tablas publicadas de encuestas
+# =========================================================
+
+@st.cache_data(ttl=600)
+def load_risk_index_by_age() -> pd.DataFrame:
+    return read_csv_safe(RISK_INDEX_BY_AGE)
+
+
+@st.cache_data(ttl=600)
+def load_deepfake_distrust_by_age() -> pd.DataFrame:
+    return read_csv_safe(DEEPFAKE_DISTRUST_BY_AGE)
+
+
+@st.cache_data(ttl=600)
+def load_exposure_index_by_age() -> pd.DataFrame:
+    return read_csv_safe(EXPOSURE_INDEX_BY_AGE)
+
+
+@st.cache_data(ttl=600)
+def load_exposure_index_by_age_robust() -> pd.DataFrame:
+    return read_csv_safe(EXPOSURE_INDEX_BY_AGE_ROBUST)
+
+
+# =========================================================
+# Artefactos de trazabilidad
+# =========================================================
+
+@st.cache_data(ttl=600)
+def load_data_quality_report() -> pd.DataFrame:
+    return read_csv_safe(DATA_QUALITY_REPORT)
+
+
+@st.cache_data(ttl=600)
+def load_variable_dictionary() -> pd.DataFrame:
+    return read_csv_safe(VARIABLE_DICTIONARY)
+
+
+@st.cache_data(ttl=600)
+def load_construct_map() -> pd.DataFrame:
+    return read_csv_safe(CONSTRUCT_MAP)
+
+
+@st.cache_data(ttl=600)
+def load_triangulation_matrix() -> pd.DataFrame:
+    return read_csv_safe(TRIANGULATION_MATRIX)
+
+
+@st.cache_data(ttl=600)
+def load_recommendation_rules() -> pd.DataFrame:
+    return read_csv_safe(RECOMMENDATION_RULES)
+
+

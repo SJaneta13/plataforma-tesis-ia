@@ -1,0 +1,18 @@
+{
+  "modelo": "Regresión logística ordinal",
+  "tipo": "Modelo interpretativo",
+  "libreria": "statsmodels OrderedModel",
+  "target": "5",
+  "split": "70% entrenamiento / 30% validación",
+  "validacion": "5 semillas y validación cruzada interna para seleccionar logit/probit",
+  "metricas": [
+    "accuracy",
+    "f1_weighted",
+    "f1_macro",
+    "mae_ordinal",
+    "kappa_qw",
+    "auc_ovr"
+  ],
+  "supuesto_evaluado": "Proportional odds mediante chequeo exploratorio por umbrales",
+  "nota": "El modelo ordinal se usa como modelo interpretativo y no como único criterio predictivo."
+}

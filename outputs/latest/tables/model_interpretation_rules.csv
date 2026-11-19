@@ -1,0 +1,5 @@
+﻿Condición,Predicción,Soporte,Confianza,Descripción
+Predictor: Identificación de contenido con IA,Influencia relativa,1.0,1.0,Importancia por permutación en el conjunto de validación. Indica contribución predictiva relativa y no causalidad.
+Predictor: Genero,Influencia relativa,1.0,0.6305174793845864,Importancia por permutación en el conjunto de validación. Indica contribución predictiva relativa y no causalidad.
+Predictor: Rol uce,Influencia relativa,1.0,0.5548108646659818,Importancia por permutación en el conjunto de validación. Indica contribución predictiva relativa y no causalidad.
+Predictor: ¿participó activamente en redes sociales o medios digitales durantes las ultimas elecciones presidenciales de 2025?,Influencia relativa,1.0,0.4684610922090501,Importancia por permutación en el conjunto de validación. Indica contribución predictiva relativa y no causalidad.

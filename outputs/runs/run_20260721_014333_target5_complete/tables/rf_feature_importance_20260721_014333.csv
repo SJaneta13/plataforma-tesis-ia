@@ -1,0 +1,110 @@
+﻿feature,importance
+Percepción sobre el uso de IA en campañas políticas [La inteligencia artificial puede mejorar la transparencia del proceso electoral.]_num,0.04894681942115464
+Percepción sobre el uso de IA en campañas políticas [El uso de inteligencia artificial en campañas políticas digitales mejora la comunicación entre partidos y ciudadanos.]_num,0.040992412783265174
+Percepción sobre el uso de IA en campañas políticas [Los partidos pueden manipular mi opinión mediante mensajes personalizados creados con IA.]_num,0.040100864099633614
+Percepción sobre el uso de IA en campañas políticas [Considero que el uso de inteligencia artificial en campañas políticas debería estar regulado por la ley.]_num,0.03983465202790851
+Percepción sobre el uso de IA en campañas políticas [La existencia de deepfakes o contenido manipulado me hace desconfiar más de las campañas políticas digitales.]_num,0.03765309911280709
+Percepción sobre el uso de IA en campañas políticas [La presencia de bots o cuentas falsas en redes sociales reduce mi confianza en la información política digital.]_num,0.03460499978425268
+¿Considera que el uso de IA en campañas digitales influyó en su decisión de voto en las elecciones presidenciales de 2025?_Nada,0.022064118111225904
+¿Por quién votó en la segunda vuelta presidencial de 2025?_Daniel Noboa,0.021675538775753192
+"Durante la campaña presidencial entre Luisa González y Daniel Noboa, ¿con qué frecuencia vio o recibió contenido político en redes sociales o plataformas digitales?_Varias veces al día",0.02164395764412539
+"¿Ha cambiado su confianza en el proceso electoral al saber que existen bots, deepfakes o manipulación mediante IA?_Sí, ahora confío menos",0.01948482769950298
+"¿Vio alguna vez un video, imagen, audio o noticia política de la campaña entre Luisa González y Daniel Noboa que le pareció “falso”, “manipulado” o generado con IA?_Sí, algunas veces",0.01827829198230443
+"¿Vio alguna vez un video, imagen, audio o noticia política de la campaña entre Luisa González y Daniel Noboa que le pareció “falso”, “manipulado” o generado con IA?_Sí, muchas veces",0.017906278393102815
+¿A través de qué dispositivos accede principalmente a Internet?_Smartphone,0.017733047451852346
+¿Participó activamente en redes sociales o medios digitales durantes las ultimas elecciones presidenciales de 2025?_No,0.017484096141194973
+"¿Realiza alguna verificación (chequea fuentes, busca noticias, consulta otras personas) de la información política digital antes de compartirla?_Siempre",0.017176379193027468
+¿Qué tipo de interacción tuvo con el contenido político digital relacionado a la campaña Noboa vs. González?_Solo leí/vi,0.016937557825311707
+¿A qué facultad o unidad académica pertenece?_Facultad de Ingeniería y Ciencias Aplicadas,0.016922253471749325
+¿A través de qué dispositivos accede principalmente a Internet?_Smartphone;Computadora,0.016682999234774086
+genero_Femenino,0.016217702879120836
+"percibe_automatizacion_Sí, lo he notado claramente",0.015988608265334766
+"¿Ha cambiado su confianza en el proceso electoral al saber que existen bots, deepfakes o manipulación mediante IA?_No ha cambiado",0.01596183986202832
+"percibe_automatizacion_Tal vez, pero no estoy seguro/a",0.015820390940044157
+"identifica_ia_Sí, fácilmente",0.01570103632220837
+¿Participó activamente en redes sociales o medios digitales durantes las ultimas elecciones presidenciales de 2025?_Prefiero no responder,0.015047920401945325
+edad_25-34,0.014994110202635746
+"¿Realiza alguna verificación (chequea fuentes, busca noticias, consulta otras personas) de la información política digital antes de compartirla?_A veces",0.014714957586278814
+conoce_ia_No,0.01469496496158054
+conoce_ia_Sí,0.014320015219507612
+¿Participó activamente en redes sociales o medios digitales durantes las ultimas elecciones presidenciales de 2025?_Sí,0.014197314810071112
+identifica_ia_A veces,0.01418465966111749
+¿Con qué frecuencia utiliza redes sociales?_Varias veces al día,0.014140013030016645
+genero_Masculino,0.014077261733973794
+edad_18-24,0.013774420547131001
+"¿Realiza alguna verificación (chequea fuentes, busca noticias, consulta otras personas) de la información política digital antes de compartirla?_Rara vez",0.012362343076285563
+"¿Conoce alguna medida, ley o regulación sobre el uso de IA en campañas políticas en Ecuador?_No",0.012275765551731287
+¿Qué tipo de interacción tuvo con el contenido político digital relacionado a la campaña Noboa vs. González?_Ignoré,0.011619903067835223
+"¿Considera que el uso de IA en campañas digitales influyó en su decisión de voto en las elecciones presidenciales de 2025?_Sí, algo",0.011129378626678933
+¿Por quién votó en la segunda vuelta presidencial de 2025?_Luisa González,0.010737487333365605
+¿A través de qué dispositivos accede principalmente a Internet?_Smartphone;Computadora;Tablet,0.010154709611478017
+¿Por quién votó en la segunda vuelta presidencial de 2025?_Nulo/blanco,0.010083582223675587
+"¿Conoce alguna medida, ley o regulación sobre el uso de IA en campañas políticas en Ecuador?_No estoy seguro/a",0.009837971801977891
+¿Por quién votó en la segunda vuelta presidencial de 2025?_Prefiero no responder,0.009777147847047923
+"Durante la campaña presidencial entre Luisa González y Daniel Noboa, ¿con qué frecuencia vio o recibió contenido político en redes sociales o plataformas digitales?_Rara vez",0.008520112397437553
+rol_uce_Estudiante de pregrado,0.008453973791604513
+"¿Conoce alguna medida, ley o regulación sobre el uso de IA en campañas políticas en Ecuador?_Sí",0.008161482647457592
+"¿Qué tipo de interacción tuvo con el contenido político digital relacionado a la campaña Noboa vs. González?_Reaccioné (me gusta, me enfada, etc.)",0.008039241404292751
+"Durante la campaña presidencial entre Luisa González y Daniel Noboa, ¿con qué frecuencia vio o recibió contenido político en redes sociales o plataformas digitales?_Varias veces a la semana",0.008011864262478576
+¿Considera que el uso de IA en campañas digitales influyó en su decisión de voto en las elecciones presidenciales de 2025?_Poco,0.007857245893711251
+conoce_ia_No estoy seguro/a,0.0075708609263600525
+"¿Vio alguna vez un video, imagen, audio o noticia política de la campaña entre Luisa González y Daniel Noboa que le pareció “falso”, “manipulado” o generado con IA?_No estoy seguro/a",0.007569320192650885
+"¿Vio alguna vez un video, imagen, audio o noticia política de la campaña entre Luisa González y Daniel Noboa que le pareció “falso”, “manipulado” o generado con IA?_No",0.007485387841038847
+¿Cree que debería regularse el uso de IA en campañas políticas digitales en el país?_Sí,0.007176365841450977
+"¿A qué facultad o unidad académica pertenece?_Facultad de Ingeniería en Geología, Minas, Petróleos y Ambiental",0.006866792933192677
+"¿Ha cambiado su confianza en el proceso electoral al saber que existen bots, deepfakes o manipulación mediante IA?_No sé",0.006834616362882219
+¿Con qué frecuencia utiliza redes sociales?_Una vez al día,0.006509351545126436
+¿Con qué frecuencia utiliza redes sociales?_Varias veces a la semana,0.006239735625939737
+¿Qué tipo de interacción tuvo con el contenido político digital relacionado a la campaña Noboa vs. González?_Comenté,0.0062338760371505215
+¿Considera que el uso de IA en campañas digitales influyó en su decisión de voto en las elecciones presidenciales de 2025?_No sé/no aplica,0.005916304491485554
+"¿Considera que el uso de IA en campañas digitales influyó en su decisión de voto en las elecciones presidenciales de 2025?_Sí, mucho",0.005758840879874003
+¿A través de qué dispositivos accede principalmente a Internet?_Computadora,0.005624717801655791
+"¿Realiza alguna verificación (chequea fuentes, busca noticias, consulta otras personas) de la información política digital antes de compartirla?_Nunca",0.005589755717894178
+genero_Otros,0.00538016528753623
+¿Cree que debería regularse el uso de IA en campañas políticas digitales en el país?_No,0.0051864983524940005
+"Durante la campaña presidencial entre Luisa González y Daniel Noboa, ¿con qué frecuencia vio o recibió contenido político en redes sociales o plataformas digitales?_Una vez al día",0.00515336490210245
+¿A través de qué dispositivos accede principalmente a Internet?_Computadora;Tablet,0.00509863319757147
+rol_uce_Estudiante de posgrado,0.004602831993942258
+rol_uce_Docente,0.004307067584492806
+"¿Ha cambiado su confianza en el proceso electoral al saber que existen bots, deepfakes o manipulación mediante IA?_Sí, ahora confío más",0.004300303143506343
+¿A qué facultad o unidad académica pertenece?_Facultad de Ciencias Administrativas,0.0041660564459477635
+percibe_automatizacion_No,0.004162721100635394
+"identifica_ia_No, me resulta difícil distinguirlo",0.003920682140987996
+¿A qué facultad o unidad académica pertenece?_Facultad de Cultura Física,0.0039019274192418373
+¿Qué tipo de interacción tuvo con el contenido político digital relacionado a la campaña Noboa vs. González?_Compartí,0.0033347088975723416
+"¿A qué facultad o unidad académica pertenece?_Facultad de Jurisprudencia, Ciencias Políticas y Sociales",0.00318780174539684
+¿Con qué frecuencia utiliza redes sociales?_Rara vez,0.0030644073549177743
+¿Cree que debería regularse el uso de IA en campañas políticas digitales en el país?_No sé,0.0019151605550829422
+¿Qué tipo de interacción tuvo con el contenido político digital relacionado a la campaña Noboa vs. González?_No tuve interacción,0.0018470742659873853
+"¿A qué facultad o unidad académica pertenece?_Facultad de Filosofía, Letras y Ciencias de la Educación",0.0017130523654483023
+¿Por quién votó en la segunda vuelta presidencial de 2025?_No voté,0.0015403105959254967
+edad_35-44,0.0013514332848987743
+¿A qué facultad o unidad académica pertenece?_Facultad de Ciencias Económicas,0.0013419943500372453
+¿A través de qué dispositivos accede principalmente a Internet?_Smartphone;Tablet,0.0012059497352770257
+¿A qué facultad o unidad académica pertenece?_Facultad de Arquitectura y Urbanismo,0.0010114050882050502
+¿A través de qué dispositivos accede principalmente a Internet?_Tablet,0.0009534783284650995
+"Durante la campaña presidencial entre Luisa González y Daniel Noboa, ¿con qué frecuencia vio o recibió contenido político en redes sociales o plataformas digitales?_Nunca",0.0007830160294988428
+edad_45-54,0.0007641945713369818
+¿A qué facultad o unidad académica pertenece?_Facultad de Derecho,0.0005810762716564284
+rol_uce_Personal administrativo,0.0005492653430989912
+¿A qué facultad o unidad académica pertenece?_Facultad de Odontología,0.0004911812964315972
+¿A qué facultad o unidad académica pertenece?_Facultad de Comunicación Social,0.0004469319159374347
+¿A qué facultad o unidad académica pertenece?_Facultad de Ciencias Psicológicas,0.0004442335510152711
+¿A qué facultad o unidad académica pertenece?_No pertenece a ninguna facultad / Área administrativa,0.00038918557748824473
+¿A qué facultad o unidad académica pertenece?_Instituto de Posgrado,0.00021071602302516948
+¿A qué facultad o unidad académica pertenece?_Facultad de Ciencias Agrícolas,0.0001454559929650998
+¿A qué facultad o unidad académica pertenece?_Facultad de Ciencias Químicas,0.00011112399124714006
+¿A qué facultad o unidad académica pertenece?_Facultad de Artes,4.218773669164422e-05
+¿Con qué frecuencia utiliza redes sociales?_Nunca,3.885825423338452e-05
+edad_55-64,0.0
+¿A qué facultad o unidad académica pertenece?_Centro de Investigación,0.0
+¿A qué facultad o unidad académica pertenece?_Facultad de Ciencias Biológicas,0.0
+¿A qué facultad o unidad académica pertenece?_Facultad de Ciencias de la Discapacidad,0.0
+reside_quito_Sí,0.0
+¿A través de qué dispositivos accede principalmente a Internet?_Smartphone;Computadora;,0.0
+¿A través de qué dispositivos accede principalmente a Internet?_Computadora;,0.0
+¿A través de qué dispositivos accede principalmente a Internet?_Smartphone;Celular,0.0
+¿A través de qué dispositivos accede principalmente a Internet?_Todas las anteriores ,0.0
+¿A través de qué dispositivos accede principalmente a Internet?_Smartphone;Computadora;Televisión ,0.0
+¿A través de qué dispositivos accede principalmente a Internet?_celular,0.0
+¿A través de qué dispositivos accede principalmente a Internet?_Computadora;celular,0.0

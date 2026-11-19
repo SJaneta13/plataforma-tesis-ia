@@ -1,0 +1,32 @@
+﻿term,thr_1,thr_2,max_abs_diff
+"¿Conoce alguna medida, ley o regulación sobre el uso de IA en campañas políticas en Ecuador?_Sí",0.28092135381759376,1.4965779722252446,1.215656618407651
+rol_uce_Estudiante de posgrado,-1.5883018287574031,-0.4273242429057511,1.160977585851652
+rol_uce_Estudiante de pregrado,-1.25424186306632,-0.31890000712093886,0.935341855945381
+"percibe_automatizacion_Sí, lo he notado claramente",-0.9639788574644509,-0.2937129174157402,0.6702659400487108
+edad_25-34,-0.8151747227334148,-0.2784749128324029,0.536699809901012
+"identifica_ia_No, me resulta difícil distinguirlo",-0.35239436305112976,-0.8348014097428618,0.482407046691732
+"¿Realiza alguna verificación (chequea fuentes, busca noticias, consulta otras personas) de la información política digital antes de compartirla?_Nunca",-0.049260762108938164,0.37626559654402425,0.4255263586529624
+genero_Otros,-0.6191633321147363,-0.21364016118578025,0.40552317092895607
+edad_35-44,0.5802896674934156,0.184879581012077,0.3954100864813386
+rol_uce_Personal administrativo,-0.8972272471416584,-0.5718261529515566,0.32540109419010177
+"¿Realiza alguna verificación (chequea fuentes, busca noticias, consulta otras personas) de la información política digital antes de compartirla?_Siempre",-0.4442714363265283,-0.13960367336557292,0.30466776296095543
+"¿Considera que el uso de IA en campañas digitales influyó en su decisión de voto en las elecciones presidenciales de 2025?_Sí, mucho",0.5258939851946778,0.22196332530401533,0.3039306598906625
+const,0.3220559717602613,0.0320922528629277,0.2899637188973336
+¿Considera que el uso de IA en campañas digitales influyó en su decisión de voto en las elecciones presidenciales de 2025?_Poco,0.0820201718295841,0.37067163446773854,0.28865146263815444
+conoce_ia_No estoy seguro/a,-0.5684033202938956,-0.2982823606544218,0.2701209596394738
+Percepción sobre el uso de IA en campañas políticas [La existencia de deepfakes o contenido manipulado me hace desconfiar más de las campañas políticas digitales.]_num,0.23467103574869372,-0.032788426119985566,0.2674594618686793
+"¿Realiza alguna verificación (chequea fuentes, busca noticias, consulta otras personas) de la información política digital antes de compartirla?_Rara vez",0.3149841120942573,0.5675885381441884,0.2526044260499311
+"percibe_automatizacion_Tal vez, pero no estoy seguro/a",-0.3997463998744703,-0.14793470792555732,0.25181169194891295
+¿Considera que el uso de IA en campañas digitales influyó en su decisión de voto en las elecciones presidenciales de 2025?_No sé/no aplica,0.44697250048536424,0.2364244859542939,0.21054801453107033
+edad_45-54,0.346366070766288,0.4780725016183427,0.1317064308520547
+¿Cree que debería regularse el uso de IA en campañas políticas digitales en el país?_No sé,0.4281009011075148,0.29787234981193333,0.13022855129558147
+"¿Conoce alguna medida, ley o regulación sobre el uso de IA en campañas políticas en Ecuador?_No estoy seguro/a",-0.11408386863331275,0.0008198706537473463,0.1149037392870601
+Percepción sobre el uso de IA en campañas políticas [El uso de inteligencia artificial en campañas políticas digitales mejora la comunicación entre partidos y ciudadanos.]_num,-0.08991931912384107,0.013429625679995727,0.1033489448038368
+Percepción sobre el uso de IA en campañas políticas [Considero que el uso de inteligencia artificial en campañas políticas debería estar regulado por la ley.]_num,0.18486240860501466,0.28398222164118414,0.09911981303616949
+edad_55-64,-1.956410437758446,-1.859465786102664,0.09694465165578192
+conoce_ia_Sí,-0.16176709709422354,-0.09441166708784444,0.0673554300063791
+genero_Masculino,0.15315933207366234,0.21399173614001699,0.06083240406635465
+"identifica_ia_Sí, fácilmente",-0.031376759037394356,-0.07740386452092435,0.04602710548352999
+¿Cree que debería regularse el uso de IA en campañas políticas digitales en el país?_Sí,0.22473978286396049,0.26982839896310634,0.045088616099145856
+"¿Considera que el uso de IA en campañas digitales influyó en su decisión de voto en las elecciones presidenciales de 2025?_Sí, algo",0.37037332976983833,0.3461983492035263,0.02417498056631201
+Percepción sobre el uso de IA en campañas políticas [Los partidos pueden manipular mi opinión mediante mensajes personalizados creados con IA.]_num,-0.015866243491078208,0.002258940283393654,0.01812518377447186

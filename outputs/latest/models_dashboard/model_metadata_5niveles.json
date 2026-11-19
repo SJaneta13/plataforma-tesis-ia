@@ -1,0 +1,28 @@
+{
+  "modelo_final": "Random Forest",
+  "configuracion": "5 niveles",
+  "variable_objetivo": "confianza_idx_round",
+  "n_registros": 575,
+  "features": 26,
+  "run_origen": "run_20260721_014333_target5_complete",
+  "analysis_mode": "complete_model",
+  "conceptual_overlap_excluded": false,
+  "metricas_multisemilla": {
+    "accuracy": 0.4554913294797688,
+    "f1_weighted": 0.4472193576243235,
+    "f1_macro": 0.3819777102001778,
+    "qwk": 0.2197451755575576,
+    "auc_ovr": 0.6762973549166413
+  },
+  "refit_full_sample_for_simulator": true,
+  "feature_importance": {
+    "method": "permutation_importance",
+    "scoring": "f1_weighted",
+    "n_repeats": 20,
+    "test_seed": 0,
+    "random_state": 42,
+    "scope": "test_set_seed_0",
+    "interpretation": "contribucion_predictiva_relativa_no_causal"
+  },
+  "proposito": "simulacion_exploratoria_no_causal"
+}

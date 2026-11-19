@@ -1,0 +1,737 @@
+﻿# dashboard/sections/resumen_general.py
+import pandas as pd
+import streamlit as st
+
+from dashboard.common import render_chart
+import plotly.express as px
+
+
+from textwrap import dedent
+
+from dashboard.components import (
+    topbar,
+    kpi_card,
+    method_card,
+)
+
+
+from dashboard.common import (
+    PLOTLY_CONFIG,
+    find_first_existing_column,
+    empty_state,
+    make_category_distribution,
+    make_likert_distribution,
+    horizontal_bar_chart,
+    donut_chart,
+    render_card_header,
+)
+
+CONFIDENCE_LABELS = {
+    1: "Muy baja confianza",
+    2: "Baja confianza",
+    3: "Confianza moderada",
+    4: "Alta confianza",
+    5: "Muy alta confianza",
+}
+
+
+LIKERT_LABELS = {
+    1: "Totalmente en desacuerdo",
+    2: "En desacuerdo",
+    3: "Ni de acuerdo ni en desacuerdo",
+    4: "De acuerdo",
+    5: "Totalmente de acuerdo",
+}
+
+
+REGULATION_LABELS = {
+    1: "Totalmente en desacuerdo",
+    2: "En desacuerdo",
+    3: "Ni de acuerdo ni en desacuerdo",
+    4: "De acuerdo",
+    5: "Totalmente de acuerdo",
+}
+
+
+PLOTLY_CONFIG = {
+    "displayModeBar": False,
+    "responsive": True,
+}
+
+LIKERT_COLORS = {
+    "Totalmente en desacuerdo": "#1D4ED8",
+    "En desacuerdo": "#93C5FD",
+    "Ni de acuerdo ni en desacuerdo": "#CBD5E1",
+    "De acuerdo": "#99F6E4",
+    "Totalmente de acuerdo": "#14B8A6",
+}
+
+CONFIDENCE_COLORS = {
+    "Muy baja confianza": "#F97316",
+    "Baja confianza": "#FDBA74",
+    "Confianza moderada": "#CBD5E1",
+    "Alta confianza": "#99F6E4",
+    "Muy alta confianza": "#14B8A6",
+}
+
+SCALE_COLORS = {
+    **LIKERT_COLORS,
+    **CONFIDENCE_COLORS,
+}
+
+def render_html(markup: str) -> None:
+    st.markdown(
+        "\n".join(
+            line.strip()
+            for line in dedent(markup).splitlines()
+            if line.strip()
+        ),
+        unsafe_allow_html=True,
+    )
+
+def pretty_model_name(name: str) -> str:
+    if not name or name == "No disponible":
+        return "No disponible"
+
+    mapping = {
+        "random_forest": "Random Forest",
+        "log_reg": "Regresión logística",
+        "svm_rbf": "SVM-RBF",
+        "hist_gradient_boosting": "Gradient Boosting",
+        "voting_ensemble": "Voting Ensemble",
+        "baseline_majority": "Baseline mayoría",
+        "baseline_stratified": "Baseline estratificado",
+    }
+
+    return mapping.get(str(name), str(name).replace("_", " ").title())
+
+
+def get_reference_model(metrics_df: pd.DataFrame):
+    """Devuelve Random Forest de cinco niveles como referencia predefinida."""
+    if metrics_df is None or metrics_df.empty:
+        return "No disponible", None
+
+    def find_col(candidates):
+        normalized = {str(c).lower().strip(): c for c in metrics_df.columns}
+
+        for candidate in candidates:
+            key = candidate.lower().strip()
+            if key in normalized:
+                return normalized[key]
+
+        for col in metrics_df.columns:
+            col_l = str(col).lower().strip()
+            for candidate in candidates:
+                if candidate.lower().strip() in col_l:
+                    return col
+
+        return None
+
+    model_col = find_col([
+        "model",
+        "modelo",
+        "model_name",
+        "nombre_modelo",
+        "algoritmo",
+    ])
+
+    config_col = find_col([
+        "configuración",
+        "configuracion",
+        "config",
+    ])
+
+    metric_col = find_col([
+        "f1_weighted_mean",
+        "f1_ponderado",
+        "f1_weighted",
+        "f1 ponderado",
+        "f1-w",
+        "f1_w",
+    ])
+
+    if model_col is None:
+        return "No disponible", None
+
+    df = metrics_df.copy()
+    model_text = df[model_col].astype(str).str.lower().str.strip()
+    rf_mask = model_text.str.contains(
+        r"random_forest|random forest",
+        regex=True,
+        na=False,
+    )
+
+    candidates = df[rf_mask].copy()
+
+    if candidates.empty:
+        return "No disponible", None
+
+    if config_col is not None:
+        config_text = candidates[config_col].astype(str).str.lower()
+        main_mask = config_text.str.contains(
+            r"5\s*niveles|cinco\s*niveles",
+            regex=True,
+            na=False,
+        )
+        if main_mask.any():
+            candidates = candidates[main_mask].copy()
+
+    reference = candidates.iloc[0]
+    score = None
+
+    if metric_col is not None:
+        value = pd.to_numeric(reference.get(metric_col), errors="coerce")
+        if pd.notna(value):
+            score = float(value)
+
+    return "Random Forest", score
+
+
+def find_first_existing_column(df: pd.DataFrame, candidates: list[str]):
+    """
+    Busca una columna por coincidencia exacta o parcial.
+    Sirve para tolerar nombres distintos en el CSV.
+    """
+    if df.empty:
+        return None
+
+    normalized = {c.lower().strip(): c for c in df.columns}
+
+    for candidate in candidates:
+        key = candidate.lower().strip()
+        if key in normalized:
+            return normalized[key]
+
+    for col in df.columns:
+        col_l = col.lower().strip()
+        for candidate in candidates:
+            if candidate.lower().strip() in col_l:
+                return col
+
+    return None
+
+
+def make_distribution_from_scale(
+    df: pd.DataFrame,
+    col: str,
+    labels: dict[int, str],
+    order: list[str],
+) -> pd.DataFrame:
+    """
+    Convierte una columna ordinal 1-5 en una distribución porcentual.
+    Solo usa respuestas válidas entre 1 y 5.
+    """
+    if df.empty or col not in df.columns:
+        return pd.DataFrame(columns=["Respuesta", "Cantidad", "Porcentaje"])
+
+    numeric = pd.to_numeric(df[col], errors="coerce").round()
+
+    temp = pd.DataFrame({"valor": numeric})
+    temp = temp[temp["valor"].isin(labels.keys())].copy()
+
+    if temp.empty:
+        return pd.DataFrame(columns=["Respuesta", "Cantidad", "Porcentaje"])
+
+    temp["Respuesta"] = temp["valor"].astype(int).map(labels)
+
+    counts = (
+        temp["Respuesta"]
+        .value_counts()
+        .reindex(order)
+        .fillna(0)
+        .astype(int)
+    )
+
+    total = counts.sum()
+
+    if total == 0:
+        return pd.DataFrame(columns=["Respuesta", "Cantidad", "Porcentaje"])
+
+    out = pd.DataFrame(
+        {
+            "Respuesta": counts.index,
+            "Cantidad": counts.values,
+            "Porcentaje": (counts.values / total * 100).round(1),
+        }
+    )
+
+    return out[out["Cantidad"] > 0].copy()
+
+def make_stacked_bar(values: pd.DataFrame, title_y: str, height: int = 190):
+    """
+    Barra apilada compacta y estable para Streamlit Cloud.
+    Usa etiquetas cortas en leyenda para evitar recortes en contenedores estrechos.
+    """
+    if values.empty or values["Porcentaje"].sum() <= 0:
+        return None
+
+    short_labels = {
+        "Totalmente en desacuerdo": "T. desacuerdo",
+        "En desacuerdo": "Desacuerdo",
+        "Ni de acuerdo ni en desacuerdo": "Neutral",
+        "De acuerdo": "Acuerdo",
+        "Totalmente de acuerdo": "T. acuerdo",
+        "Muy baja confianza": "Muy baja",
+        "Baja confianza": "Baja",
+        "Confianza moderada": "Moderada",
+        "Alta confianza": "Alta",
+        "Muy alta confianza": "Muy alta",
+    }
+
+    color_map_short = {
+        short_labels.get(label, label): color
+        for label, color in SCALE_COLORS.items()
+    }
+
+    plot_df = values.copy()
+    plot_df["Porcentaje"] = 100 * plot_df["Cantidad"] / plot_df["Cantidad"].sum()
+    plot_df["Respuesta_full"] = plot_df["Respuesta"].astype(str)
+    plot_df["Respuesta_plot"] = plot_df["Respuesta_full"].map(short_labels).fillna(
+        plot_df["Respuesta_full"]
+    )
+
+    fig = px.bar(
+        plot_df,
+        x="Porcentaje",
+        y=[title_y] * len(plot_df),
+        color="Respuesta_plot",
+        orientation="h",
+        text="Porcentaje",
+        custom_data=["Respuesta_full", "Cantidad"],
+        category_orders={
+            "Respuesta_plot": [
+                short_labels.get(label, label)
+                for label in values["Respuesta"].tolist()
+            ]
+        },
+        color_discrete_map=color_map_short,
+    )
+
+    for trace in fig.data:
+        trace.name = f"{trace.name} · {trace.x[0]:.1f}%"
+
+    fig.update_traces(
+        texttemplate="%{text:.1f}%",
+        textposition="inside",
+        insidetextanchor="middle",
+        textfont=dict(size=11),
+        cliponaxis=False,
+        hovertemplate=(
+            "<b>%{customdata[0]}</b><br>"
+            "Cantidad: %{customdata[1]}<br>"
+            "Porcentaje: %{x:.1f}%<extra></extra>"
+        ),
+    )
+
+    fig.update_layout(
+        barmode="stack",
+        autosize=True,
+        height=max(height, 210),
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
+        xaxis=dict(
+            visible=False,
+            range=[0, 100],
+            fixedrange=True,
+        ),
+        yaxis=dict(
+            visible=False,
+            fixedrange=True,
+        ),
+        margin=dict(l=4, r=12, t=4, b=58),
+        legend_title_text="",
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-0.18,
+            xanchor="center",
+            x=0.5,
+            font=dict(size=9),
+            itemclick=False,
+            itemdoubleclick=False,
+        ),
+        uniformtext_minsize=8,
+        uniformtext_mode="show",
+    )
+
+    return fig
+
+def empty_state(message: str):
+    st.markdown(
+        f"""
+        <div class="empty-state">
+            {message}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+
+def render_resumen_general(
+    survey_df: pd.DataFrame,
+    news_df: pd.DataFrame,
+    metrics_df: pd.DataFrame,
+):
+    n_survey = len(survey_df) if not survey_df.empty else 0
+    n_news = len(news_df) if not news_df.empty else 0
+
+    n_cases = (
+        news_df["case_id"].nunique()
+        if not news_df.empty and "case_id" in news_df.columns
+        else 0
+    )
+
+    n_domains = (
+        news_df["domain"].nunique()
+        if not news_df.empty and "domain" in news_df.columns
+        else 0
+    )
+
+    reference_model, reference_score = get_reference_model(metrics_df)
+
+    # =========================================================
+    # ENCABEZADO
+    # =========================================================
+    topbar(
+        title="Resumen General",
+        subtitle=(
+            "Análisis de la percepción ciudadana sobre el uso de inteligencia artificial "
+            "en campañas políticas digitales. Caso: elecciones presidenciales Ecuador 2025."
+        ),
+        pill_text=f"n = {n_survey:,} encuestas" if n_survey else "encuestas no cargadas",
+    )
+
+    st.markdown("## Resumen General del Estudio")
+    st.markdown(
+        """
+        Esta plataforma presenta los resultados del trabajo de titulación sobre la percepción ciudadana
+        frente al uso de inteligencia artificial en campañas políticas digitales. La encuesta constituye
+        la fuente principal del análisis; los registros de redes y medios se incorporan como evidencia
+        digital complementaria y exploratoria. La encuesta reunió a 575 participantes
+        por conveniencia. Las asociaciones describen esta muestra.
+        """
+    )
+
+    # =========================================================
+    # KPI CARDS
+    # =========================================================
+    score_label = f"{reference_score:.3f}" if reference_score is not None else "N/D"
+
+    render_html(
+        f"""
+        <div class="rg-kpi-grid">
+            <div class="rg-kpi blue">
+                <div class="rg-kpi-label">Encuestas válidas</div>
+                <div class="rg-kpi-value">{n_survey:,}</div>
+                <div class="rg-kpi-help">Registros procesados de la muestra.</div>
+            </div>
+
+            <div class="rg-kpi purple">
+                <div class="rg-kpi-label">Corpus analíticos</div>
+                <div class="rg-kpi-value">{n_cases:,}</div>
+                <div class="rg-kpi-help">Casos o fuentes de evidencia digital agrupada.</div>
+            </div>
+
+            <div class="rg-kpi yellow">
+                <div class="rg-kpi-label">Registros digitales</div>
+                <div class="rg-kpi-value">{n_news:,}</div>
+                <div class="rg-kpi-help">Registros de GDELT, medios o redes procesadas.</div>
+            </div>
+
+            <div class="rg-kpi green">
+                <div class="rg-kpi-label">Dominios</div>
+                <div class="rg-kpi-value">{n_domains:,}</div>
+                <div class="rg-kpi-help">Fuentes informativas únicas.</div>
+            </div>
+
+            <div class="rg-kpi cyan">
+                <div class="rg-kpi-label">Modelo de referencia</div>
+                <div class="rg-kpi-value small">{reference_model}</div>
+                <div class="rg-kpi-help">F1 ponderado · 5 niveles: {score_label}</div>
+            </div>
+        </div>
+        """
+    )
+
+    # =========================================================
+    # HIPÓTESIS + PERFIL
+    # =========================================================
+    left, right = st.columns([1, 1], gap="small")
+
+    with left:
+
+        render_html(
+            """
+            <div class="custom-card">
+                <div class="card-title">Resultados de las hipótesis</div>
+
+                <div class="hypothesis-grid">
+                    <div class="hypothesis-box h1-box">
+                        <div class="hypothesis-label">H1 · Uso percibido de IA y confianza</div>
+                        <div class="hypothesis-text">
+                            Respaldo parcial. Mayor riesgo percibido se asoció débilmente con menor
+                            confianza electoral (ρ = −0,1344; p = 0,0012).
+                        </div>
+                    </div>
+
+                    <div class="hypothesis-box h2-box">
+                        <div class="hypothesis-label">H2 · Verificación informativa</div>
+                        <div class="hypothesis-text">
+                            La hipótesis de moderación quedó sin confirmación estadística
+                            (p = 0,403 para la interacción).
+                        </div>
+                    </div>
+                </div>
+            </div>
+            """
+        )
+        method_html = """
+            <div class="method-grid">
+                <div class="method-card">
+                    <div class="method-title">Variable dependiente</div>
+                    <div class="method-text">Nivel de confianza electoral expresado mediante escala ordinal.</div>
+                </div>
+                <div class="method-card">
+                    <div class="method-title">Variables independientes</div>
+                    <div class="method-text">Percepción del uso de IA, exposición digital, riesgo percibido, automatización, verificación informativa y perfil sociodemográfico.</div>
+                </div>
+                <div class="method-card">
+                    <div class="method-title">Metodología</div>
+                    <div class="method-text">CRISP-DM, enfoque cuantitativo descriptivo-exploratorio, modelado predictivo y evidencia digital contextual.</div>
+                </div>
+            </div>
+            """
+
+        st.markdown(method_html, unsafe_allow_html=True)
+
+    with right:
+        with st.container(key="card_rg_perfil"):
+
+            render_card_header(
+                "Perfil de la muestra",
+                "Distribución de participantes según género",
+            )
+
+            gender_col = find_first_existing_column(
+                survey_df,
+                ["genero", "género", "gender", "sexo"],
+            )
+
+            if not survey_df.empty and gender_col:
+                gender_df = (
+                    survey_df[gender_col]
+                    .fillna("No especificado")
+                    .astype(str)
+                    .value_counts()
+                    .reset_index()
+                )
+                gender_df.columns = ["Género", "Cantidad"]
+
+                fig = px.pie(
+                    gender_df,
+                    names="Género",
+                    values="Cantidad",
+                    hole=0.48,
+                )
+
+                fig.update_traces(
+                    
+                    textposition="inside",
+                    textinfo="percent",
+                    hovertemplate=(
+                        "<b>%{label}</b><br>"
+                        "Cantidad: %{value}<br>"
+                        "Porcentaje: %{percent}<extra></extra>"
+                    ),
+                )
+
+                fig.update_layout(
+                    height=285,
+                    paper_bgcolor="#ffffff",
+                    plot_bgcolor="#ffffff",
+                    margin=dict(l=8, r=8, t=0, b=48),
+                    legend_title_text="",
+                    legend=dict(
+                        orientation="h",
+                        yanchor="top",
+                        y=-0.08,
+                        xanchor="center",
+                        x=0.5,
+                        font=dict(size=11),
+                    ),
+                )
+
+                render_chart(fig, config=PLOTLY_CONFIG)
+            else:
+                empty_state("No se encontró columna de género en el archivo de encuestas.")
+
+    
+
+    # =========================================================
+    # ACEPTACIÓN + CONFIANZA
+    # =========================================================
+
+    chart1, chart2 = st.columns(2, gap="small")
+
+    with chart1:
+        with st.container(key="card_rg_aceptacion"):
+            render_card_header(
+                "IA y comunicación entre partidos y ciudadanos",
+                "Distribución de respuestas válidas en escala Likert",
+            )
+
+
+            perception_col = find_first_existing_column(
+                survey_df,
+                [
+                    "Percepción sobre el uso de IA en campañas políticas [El uso de inteligencia artificial en campañas políticas digitales mejora la comunicación entre partidos y ciudadanos.]_num",
+                    "El uso de inteligencia artificial en campañas políticas digitales mejora la comunicación entre partidos y ciudadanos",
+                    "mejora la comunicación entre partidos y ciudadanos",
+                ],
+            )
+
+            if not survey_df.empty and perception_col:
+                order = list(LIKERT_LABELS.values())
+
+                values = make_distribution_from_scale(
+                    survey_df,
+                    perception_col,
+                    LIKERT_LABELS,
+                    order,
+                )
+
+                fig = make_stacked_bar(values, "Aceptación", height=190)
+
+                if fig is not None:
+                    render_chart(fig, config=PLOTLY_CONFIG)
+                else:
+                    empty_state(
+                        "La columna detectada no contiene una escala válida de aceptación."
+                    )
+            else:
+                empty_state("No se encontró una columna de aceptación/percepción de IA.")
+
+            st.markdown(
+                """
+                <div class="alert-warning">
+                    Este indicador corresponde al ítem sobre si la IA mejora la comunicación entre partidos y ciudadanos.
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+
+
+    with chart2:
+        with st.container(key="card_rg_confianza"):
+            render_card_header(
+                "Nivel de confianza electoral",
+                "Percepción posterior al proceso electoral 2025",
+            )
+
+            confidence_col = find_first_existing_column(
+                survey_df,
+                [
+                    "confianza_idx_round",
+                    "confianza_electoral",
+                    "nivel_confianza",
+                ],
+            )
+
+            if not survey_df.empty and confidence_col:
+                order = list(CONFIDENCE_LABELS.values())
+
+                conf_df = make_distribution_from_scale(
+                    survey_df,
+                    confidence_col,
+                    CONFIDENCE_LABELS,
+                    order,
+                )
+
+                fig = make_stacked_bar(conf_df, "Confianza", height=190)
+
+                if fig is not None:
+                    render_chart(fig, config=PLOTLY_CONFIG)
+                else:
+                    empty_state(
+                        "La columna de confianza electoral no contiene una escala 1-5 válida."
+                    )
+            else:
+                empty_state("No se encontró columna de confianza electoral.")
+
+            st.markdown(
+                """
+                <div class="alert-danger">
+                    Este indicador permite observar el estado de la confianza electoral en la muestra analizada.
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    # =========================================================
+    # REGULACIÓN
+    # =========================================================
+
+    with st.container(key="card_rg_regulacion"):
+        render_card_header(
+            "Demanda ciudadana de regulación de IA en campañas",
+            "¿Considera necesaria una regulación específica para el uso de IA electoral?",
+        )
+
+        regulation_col = find_first_existing_column(
+            survey_df,
+            [
+                "Percepción sobre el uso de IA en campañas políticas [Considero que el uso de inteligencia artificial en campañas políticas debería estar regulado por la ley.]_num",
+                "Considero que el uso de inteligencia artificial en campañas políticas debería estar regulado por la ley",
+                "debería estar regulado por la ley",
+            ],
+        )
+
+        if not survey_df.empty and regulation_col:
+            order = [
+                "Totalmente de acuerdo",
+                "De acuerdo",
+                "Ni de acuerdo ni en desacuerdo",
+                "En desacuerdo",
+                "Totalmente en desacuerdo",
+            ]
+
+            reg_df = make_distribution_from_scale(
+                survey_df,
+                regulation_col,
+                REGULATION_LABELS,
+                order,
+            )
+
+            if reg_df.empty:
+                empty_state(
+                    "La columna detectada no contiene una escala 1-5 válida para regulación."
+                )
+            else:
+                rows = []
+                for label, count, pct in reg_df[["Respuesta", "Cantidad", "Porcentaje"]].itertuples(index=False, name=None):
+                    rows.append(
+                        f'<div class="rg-regulation-row">'
+                        f'<div class="rg-regulation-label"><span>{label}</span>'
+                        f'<span>{pct:.1f}% · n={count}</span></div>'
+                        f'<div class="rg-regulation-track" aria-hidden="true">'
+                        f'<div class="progress-fill" style="width:{pct}%"></div></div></div>'
+                    )
+                st.markdown(
+                    '<div class="rg-regulation-list">' + "".join(rows) + "</div>",
+                    unsafe_allow_html=True,
+                )
+        else:
+            empty_state("No se encontró columna de regulación de IA.") 
+        
+
+    st.markdown(
+    """
+    <div class="method-note">
+        <strong>Nota metodológica:</strong> la encuesta es la fuente principal del análisis.
+        Los registros de redes y medios se interpretan como evidencia digital complementaria, no como prueba causal.
+    </div>
+    """,
+    unsafe_allow_html=True,
+    )

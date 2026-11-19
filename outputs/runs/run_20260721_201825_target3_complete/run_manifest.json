@@ -1,0 +1,49 @@
+{
+  "run_name": "run_20260721_201825_target3_complete",
+  "run_id": "20260721_201825",
+  "created_at": "2026-07-21T20:54:49",
+  "target_levels": 3,
+  "target_column": "confianza_3",
+  "configuration_role": "complementaria_3_niveles",
+  "analysis_mode": "complete",
+  "sensitivity": false,
+  "conceptual_overlap_excluded": false,
+  "input_path": "C:\\Users\\a\\Documents\\tesis_ia_campanas\\data\\processed\\encuestas\\model_ready_no_text.csv",
+  "input_sha256": "4ac47d6325d2062cb1a3d3dc22f714333460bbf01bf14f80915a51068d3dddcc",
+  "dataset_rows": 575,
+  "dataset_columns_original": 44,
+  "model_features": 26,
+  "numeric_features": 6,
+  "categorical_features": 20,
+  "likert_text_duplicates_excluded": [
+    "Percepción sobre el uso de IA en campañas políticas [Considero que el uso de inteligencia artificial en campañas políticas debería estar regulado por la ley.]",
+    "Percepción sobre el uso de IA en campañas políticas [El uso de inteligencia artificial en campañas políticas digitales mejora la comunicación entre partidos y ciudadanos.]",
+    "Percepción sobre el uso de IA en campañas políticas [La existencia de deepfakes o contenido manipulado me hace desconfiar más de las campañas políticas digitales.]",
+    "Percepción sobre el uso de IA en campañas políticas [La inteligencia artificial puede mejorar la transparencia del proceso electoral.]",
+    "Percepción sobre el uso de IA en campañas políticas [La presencia de bots o cuentas falsas en redes sociales reduce mi confianza en la información política digital.]",
+    "Percepción sobre el uso de IA en campañas políticas [Los partidos pueden manipular mi opinión mediante mensajes personalizados creados con IA.]"
+  ],
+  "conceptual_overlap_variables_excluded": [],
+  "seeds": [
+    0,
+    7,
+    13,
+    21,
+    42
+  ],
+  "test_size": 0.3,
+  "cv_splits": 5,
+  "refit_metric": "f1_weighted",
+  "models_executed": [
+    "baseline_majority",
+    "baseline_stratified",
+    "log_reg",
+    "random_forest",
+    "svm_rbf",
+    "hist_gradient_boosting",
+    "voting_ensemble"
+  ],
+  "fast_debug": false,
+  "metrics_summary": "tables\\metrics_run_20260721_201825.csv",
+  "metrics_by_seed": "tables\\metrics_by_seed_20260721_201825.csv"
+}

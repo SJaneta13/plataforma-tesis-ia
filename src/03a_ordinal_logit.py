@@ -1,0 +1,794 @@
+import json
+import time
+import warnings
+import numpy as np
+import pandas as pd
+import matplotlib
+import statsmodels.api as sm
+import argparse
+import sys
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+# Suprimir warnings (HessianInversion, convergence, etc.)
+warnings.filterwarnings("ignore")
+
+
+from pathlib import Path
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+
+from datetime import datetime
+
+from sklearn.model_selection import train_test_split, StratifiedKFold
+from sklearn.preprocessing import label_binarize
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    confusion_matrix,
+    classification_report,
+    roc_auc_score,
+)
+from statsmodels.miscmodels.ordinal_model import OrderedModel
+
+from src.ordinal_inputs import select_ordinal_inputs
+
+from src.plotting_style import set_paper_style, save_figure, prettify_and_shorten
+
+
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", message=".*Maximum Likelihood optimization.*")
+
+
+
+# =========================
+# CONFIG (alineado con 03_modeling.py y tesis)
+# =========================
+parser = argparse.ArgumentParser()
+
+parser.add_argument(
+    "--sensitivity",
+    action="store_true",
+    help=(
+        "Excluye predictores conceptualmente relacionados "
+        "con confianza o transparencia electoral."
+    ),
+)
+
+parser.add_argument(
+    "--target",
+    choices=["5", "3"],
+    default="5",
+)
+
+parser.add_argument(
+    "--input",
+    default="data/processed/encuestas/model_ready_no_text.csv",
+)
+
+parser.add_argument(
+    "--run-dir",
+    required=True,
+    help=(
+        "Nombre exacto de la carpeta de outputs/runs creada por "
+        "03_modeling.py para el mismo target y modo."
+    ),
+)
+
+args = parser.parse_args()
+
+SENSITIVITY_ANALYSIS = bool(args.sensitivity)
+INPUT_PATH = args.input
+RUN_TARGET = args.target
+
+
+# =========================
+# OUTPUTS
+# =========================
+RUNS_DIR = ROOT / "outputs" / "runs"
+selected_run = RUNS_DIR / args.run_dir
+
+if not selected_run.exists():
+    raise FileNotFoundError(
+        f"No existe la carpeta indicada: {selected_run}"
+    )
+
+expected_mode = "sensitivity" if SENSITIVITY_ANALYSIS else "complete"
+expected_target_token = f"_target{RUN_TARGET}_"
+expected_mode_suffix = f"_{expected_mode}"
+
+if expected_target_token not in selected_run.name:
+    raise ValueError(
+        f"La corrida {selected_run.name} no corresponde al target "
+        f"{RUN_TARGET} niveles."
+    )
+
+if not selected_run.name.endswith(expected_mode_suffix):
+    raise ValueError(
+        f"La corrida {selected_run.name} no corresponde al modo "
+        f"{expected_mode}."
+    )
+
+manifest_path = selected_run / "run_manifest.json"
+if not manifest_path.exists():
+    raise FileNotFoundError(
+        "La corrida no contiene run_manifest.json. "
+        "Debe generarse nuevamente con 03_modeling.py."
+    )
+
+run_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+if str(run_manifest.get("target_levels")) != RUN_TARGET:
+    raise ValueError(
+        "El target registrado en run_manifest.json no coincide con "
+        f"--target {RUN_TARGET}."
+    )
+
+if run_manifest.get("analysis_mode") != expected_mode:
+    raise ValueError(
+        "El modo registrado en run_manifest.json no coincide con "
+        f"{expected_mode}."
+    )
+
+last_run = selected_run.name
+
+OUT_DIR = selected_run / "ordinal"
+OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+FIG_DIR = selected_run / "figures" / "ordinal"
+FIG_DIR.mkdir(parents=True, exist_ok=True)
+
+TABLES_DIR = selected_run / "tables"
+
+set_paper_style()
+
+print(
+    "Modo ordinal:",
+    "sensibilidad" if SENSITIVITY_ANALYSIS else "completo",
+)
+print("Run seleccionado:", selected_run)
+print("Guardando ordinal en:", OUT_DIR)
+print("Guardando figuras ordinal en:", FIG_DIR)
+
+
+
+TARGET_5 = "confianza_idx_round"  # 1..5
+TEST_SIZE = 0.30  # Tesis: 70% train / 30% validación
+N_SPLITS = 5  # k-fold interno para comparación logit vs probit
+
+# Mismas semillas que 03_modeling.py para comparación justa
+SEEDS = [0, 7, 13, 21, 42]
+
+
+
+
+# =========================
+# Helpers (métricas ordinales)
+# =========================
+def mae_ordinal(y_true, y_pred):
+    y_true = np.asarray(y_true, dtype=float)
+    y_pred = np.asarray(y_pred, dtype=float)
+    return float(np.mean(np.abs(y_true - y_pred)))
+
+
+def quadratic_weighted_kappa(y_true, y_pred, min_rating, max_rating):
+    y_true = np.asarray(y_true, dtype=int)
+    y_pred = np.asarray(y_pred, dtype=int)
+
+    K = max_rating - min_rating + 1
+    O = np.zeros((K, K), dtype=float)
+
+    for a, p in zip(y_true, y_pred):
+        O[a - min_rating, p - min_rating] += 1
+
+    act_hist = np.bincount(y_true - min_rating, minlength=K).astype(float)
+    pred_hist = np.bincount(y_pred - min_rating, minlength=K).astype(float)
+
+    E = np.outer(act_hist, pred_hist)
+    E = E / E.sum() * O.sum()
+
+    W = np.zeros((K, K), dtype=float)
+    for i in range(K):
+        for j in range(K):
+            W[i, j] = ((i - j) ** 2) / ((K - 1) ** 2)
+
+    num = (W * O).sum()
+    den = (W * E).sum()
+    return float(1 - (num / den if den != 0 else 0))
+
+
+def compute_auc_ovr(y_true, y_proba, n_classes):
+    """AUC One-vs-Rest para clasificación multiclase ordinal."""
+    try:
+        y_bin = label_binarize(y_true, classes=list(range(1, n_classes + 1)))
+        if y_bin.shape[1] == 1:
+            return float(roc_auc_score(y_bin, y_proba[:, :1]))
+        return float(
+            roc_auc_score(y_bin, y_proba, multi_class="ovr", average="weighted")
+        )
+    except Exception:
+        return float("nan")
+
+
+def eval_metrics(y_true, y_pred, y_proba, n_classes):
+    acc = accuracy_score(y_true, y_pred)
+    f1w = f1_score(y_true, y_pred, average="weighted", zero_division=0)
+    f1m = f1_score(y_true, y_pred, average="macro", zero_division=0)
+    mae = mae_ordinal(y_true, y_pred)
+    qwk = quadratic_weighted_kappa(
+        y_true, y_pred, min_rating=1, max_rating=n_classes
+    )
+    auc = compute_auc_ovr(y_true, y_proba, n_classes)
+    return {
+        "accuracy": float(acc),
+        "f1_weighted": float(f1w),
+        "f1_macro": float(f1m),
+        "mae_ordinal": float(mae),
+        "kappa_qw": float(qwk),
+        "auc_ovr": auc,
+    }
+
+
+def to_3_classes(x):
+    if x <= 2:
+        return 1
+    elif x == 3:
+        return 2
+    else:
+        return 3
+
+
+def check_proportional_odds_exploratory(X_train, y_train, n_classes, out_path):
+    rows = []
+    Xc = sm.add_constant(X_train, has_constant="add")  # mantiene nombres
+
+    for k in range(1, n_classes):
+        y_bin = (y_train.values <= k).astype(int)
+        try:
+            res = sm.Logit(y_bin, Xc).fit(disp=False, maxiter=200)
+            coef = pd.Series(res.params, index=Xc.columns, name=f"thr_{k}")
+        except Exception:
+            coef = pd.Series([np.nan]*Xc.shape[1], index=Xc.columns, name=f"thr_{k}")
+        rows.append(coef)
+
+    coef_df = pd.concat(rows, axis=1).reset_index().rename(columns={"index":"term"})
+    thr_cols = [c for c in coef_df.columns if c.startswith("thr_")]
+    coef_df["max_abs_diff"] = coef_df[thr_cols].apply(
+        lambda r: float(np.nanmax(r.values) - np.nanmin(r.values))
+        if np.isfinite(r.values).any() else np.nan,
+        axis=1
+    )
+    coef_df = coef_df.sort_values("max_abs_diff", ascending=False)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    coef_df.to_csv(out_path, index=False, encoding="utf-8-sig")
+
+
+    return coef_df
+
+
+
+def build_x_y(df, target_col):
+    X = select_ordinal_inputs(df, sensitivity=SENSITIVITY_ANALYSIS)
+    y = df[target_col].astype(int).copy()
+
+    # One-hot encoding
+    x_enc = pd.get_dummies(X, drop_first=True)
+
+    # Limpieza numérica
+    x_enc = x_enc.replace([np.inf, -np.inf], np.nan)
+    med = x_enc.median(numeric_only=True)
+    x_enc = x_enc.fillna(med).fillna(0)
+    x_enc = x_enc.apply(pd.to_numeric, errors="coerce").fillna(0.0).astype(float)
+
+    if "const" in x_enc.columns:
+        x_enc = x_enc.drop(columns=["const"])
+
+    # Quitar columnas constantes o varianza 0
+    nunique = x_enc.nunique(dropna=False)
+    const_cols = nunique[nunique <= 1].index.tolist()
+    var0_cols = x_enc.columns[(x_enc.var(axis=0) == 0)].tolist()
+    drop_cols = sorted(set(const_cols + var0_cols))
+    if drop_cols:
+        x_enc = x_enc.drop(columns=drop_cols)
+
+    if x_enc.shape[1] == 0:
+        raise ValueError("x_enc quedó sin columnas después de limpieza.")
+
+    return x_enc, y
+
+
+# =========================
+# Plot helpers
+# =========================
+
+
+def plot_confusion_matrix_norm(
+    cm, labels, out_base: Path, *, normalize: str | None = "true", cmap="Blues"
+):
+    cm = np.asarray(cm, dtype=float)
+    counts = cm.copy()
+
+    do_norm = normalize is not None
+
+    if normalize == "true":
+        row_sums = cm.sum(axis=1, keepdims=True)
+        cm = np.divide(cm, row_sums, out=np.zeros_like(cm), where=row_sums != 0)
+    elif normalize == "pred":
+        col_sums = cm.sum(axis=0, keepdims=True)
+        cm = np.divide(cm, col_sums, out=np.zeros_like(cm), where=col_sums != 0)
+    elif normalize is None:
+        pass
+    else:
+        raise ValueError("normalize must be 'true', 'pred', or None")
+
+
+    fig, ax = plt.subplots(figsize=(3.6, 3.3))
+    plt.subplots_adjust(left=0.18, right=0.95, top=0.88, bottom=0.14)
+
+    im = ax.imshow(
+        cm,
+        interpolation="nearest",
+        cmap=cmap,
+        vmin=0,
+        vmax=1 if do_norm else None,
+    )
+
+    ax.set_xlabel("Predicción")
+    ax.set_ylabel("Real")
+    ax.set_xticks(range(len(labels)))
+    ax.set_yticks(range(len(labels)))
+    ax.set_xticklabels(labels)
+    ax.set_yticklabels(labels)
+
+    cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    cbar.set_label("Proporción" if do_norm else "Conteo")
+
+    for i in range(cm.shape[0]):
+        for j in range(cm.shape[1]):
+            if do_norm:
+                pct = 100 * cm[i, j]
+                txt = f"{pct:.0f}%\n(n={int(counts[i, j])})"
+            else:
+                txt = f"{int(counts[i, j])}"
+            ax.text(j, i, txt, ha="center", va="center", fontsize=7)
+
+    ax.set_xticks(np.arange(-0.5, len(labels), 1), minor=True)
+    ax.set_yticks(np.arange(-0.5, len(labels), 1), minor=True)
+    ax.grid(which="minor", linestyle="-", linewidth=0.4, alpha=0.4)
+    ax.tick_params(which="minor", bottom=False, left=False)
+
+    save_figure(fig, out_base, dpi=600, save_png=True, save_pdf=True, save_svg=True)
+    plt.close(fig)
+
+
+
+
+def plot_or_forest(coef_df: pd.DataFrame, out_base: Path, *, top_n=10):
+    d = coef_df.copy()
+
+    # filtra thresholds/cuts robusto
+    is_threshold = (
+        d["term"].astype(str).str.match(r"^\s*\d+\s*/\s*\d+\s*$") |
+        d["term"].astype(str).str.contains("cut|threshold", case=False, regex=True)
+    )
+    d = d[~is_threshold].copy()
+
+    # requiere CI
+    if not {"or_ci_low", "or_ci_high"}.issubset(d.columns):
+        return
+
+    d = d.replace([np.inf, -np.inf], np.nan).dropna(subset=["odds_ratio", "or_ci_low", "or_ci_high"]).copy()
+
+    # pretty labels
+    d["term_pretty"] = d["term"].apply(lambda s: prettify_and_shorten(s, max_len=42))
+
+    d["rank_key"] = np.abs(np.log(d["odds_ratio"].clip(1e-9)))
+    d = d.sort_values("rank_key", ascending=False).head(top_n).iloc[::-1]
+
+    fig, ax = plt.subplots(figsize=(7.2, 4.8))
+
+    ax.errorbar(
+        d["odds_ratio"],
+        d["term_pretty"],
+        xerr=[d["odds_ratio"] - d["or_ci_low"], 
+              d["or_ci_high"] - d["odds_ratio"]],
+        fmt="o",
+        capsize=3,
+        linewidth=1.2
+    )
+    ax.axvline(1.0, linestyle="--", linewidth=1)
+    ax.set_xscale("log")
+    ax.set_xlabel("Odds Ratio (escala log)")
+    ax.set_ylabel("")
+    ax.set_title("Efectos principales del modelo ordinal", pad=10)
+    ax.tick_params(axis="y", labelsize=8)
+    ax.tick_params(axis="x", labelsize=8)
+
+    plt.subplots_adjust(left=0.44, right=0.97, top=0.88, bottom=0.14)
+
+
+    save_figure(fig, out_base, dpi=600, save_png=True, save_pdf=True, save_svg=True)
+    plt.close(fig)
+
+
+# =========================
+# Load data
+# =========================
+df = pd.read_csv(INPUT_PATH, encoding="utf-8-sig").copy()
+df = df.dropna(subset=[TARGET_5]).copy()
+df[TARGET_5] = df[TARGET_5].astype(int)
+df["confianza_3"] = df[TARGET_5].apply(to_3_classes).astype(int)
+
+print(f"Dataset para ordinal: {df.shape}")
+print(f"Distribución target 5: {df[TARGET_5].value_counts().sort_index().to_dict()}")
+print(
+    f"Distribución target 3: {df['confianza_3'].value_counts().sort_index().to_dict()}"
+)
+
+
+# =========================
+# ORDINAL FIT con CV interno (logit vs probit)
+# =========================
+def fit_ordinal_single(X_train, y_train, X_test, distr="logit"):
+    model = OrderedModel(y_train, X_train, distr=distr)
+    res = model.fit(method="lbfgs", disp=False, maxiter=500)
+    proba = res.model.predict(res.params, exog=X_test)
+    y_pred = (np.argmax(proba, axis=1) + 1).astype(int)
+    return y_pred, np.asarray(proba), res
+
+
+def cv_select_distribution(X_train, y_train, n_classes, seed):
+    """Validación cruzada k=5 interna para seleccionar logit vs probit."""
+    skf = StratifiedKFold(n_splits=N_SPLITS, shuffle=True, random_state=seed)
+    cv_scores = {"logit": [], "probit": []}
+
+    for fold_idx, (train_idx, val_idx) in enumerate(skf.split(X_train, y_train)):
+        X_tr = X_train.iloc[train_idx]
+        y_tr = y_train.iloc[train_idx]
+        X_val = X_train.iloc[val_idx]
+        y_val = y_train.iloc[val_idx]
+
+        # Quitar columnas varianza 0 del fold
+        zero_var = X_tr.columns[(X_tr.var(axis=0) == 0)].tolist()
+        if zero_var:
+            X_tr = X_tr.drop(columns=zero_var)
+            X_val = X_val.drop(columns=zero_var, errors="ignore")
+        X_val = X_val.reindex(columns=X_tr.columns, fill_value=0.0)
+
+        for distr in ["logit", "probit"]:
+            try:
+                y_pred, _, _ = fit_ordinal_single(X_tr, y_tr, X_val, distr=distr)
+                qwk = quadratic_weighted_kappa(y_val, y_pred, min_rating=1, max_rating=n_classes)
+                cv_scores[distr].append(float(qwk))
+            except Exception:
+                cv_scores[distr].append(0.0)
+
+    mean_logit = np.mean(cv_scores["logit"])
+    mean_probit = np.mean(cv_scores["probit"])
+
+    best_distr = "logit" if mean_logit >= mean_probit else "probit"
+
+    return best_distr, {
+        "cv_qwk_logit_mean": mean_logit,
+        "cv_qwk_logit_std": float(np.std(cv_scores["logit"], ddof=0)),
+        "cv_qwk_probit_mean": mean_probit,
+        "cv_qwk_probit_std": float(np.std(cv_scores["probit"], ddof=0)),
+    }
+
+
+# =========================
+# MAIN LOOP: Multi-seed (igual que 03_modeling.py)
+# =========================
+rows_seed_level = []
+all_summaries = []
+
+
+def run_ordinal_multi_seed(target_col, n_classes, tag):
+    print(f"\n{'='*50}")
+    print(f"Ordinal Logit/Probit - {tag} ({n_classes} clases)")
+    print(f"{'='*50}")
+
+    X_enc, y = build_x_y(df, target_col)
+
+    per_seed_metrics = []
+
+    
+
+    for seed in SEEDS:
+        print(f"\n  Seed {seed}:")
+        t_start = time.perf_counter()
+
+        
+
+        # Split 70/30 estratificado (mismo que sklearn models)
+        X_train, X_test, y_train, y_test = train_test_split(
+            X_enc, y, test_size=TEST_SIZE, random_state=seed, stratify=y
+        )
+
+        # Quitar columnas varianza 0 del TRAIN y alinear TEST
+        zero_var = X_train.columns[(X_train.var(axis=0) == 0)].tolist()
+        if zero_var:
+            X_train = X_train.drop(columns=zero_var)
+            X_test = X_test.drop(columns=zero_var, errors="ignore")
+        X_test = X_test.reindex(columns=X_train.columns, fill_value=0.0)
+
+        # === Chequeo exploratorio de proportional odds (solo 1 vez) ===
+        if seed == SEEDS[0]:
+            po_path = OUT_DIR / f"po_check_{tag}.csv"
+            try:
+                check_proportional_odds_exploratory(
+                    X_train=X_train,
+                    y_train=y_train,
+                    n_classes=n_classes,
+                    out_path=po_path
+                )
+                print(f"    PO-check guardado en: {po_path.name}")
+            except Exception as e:
+                print(f"    PO-check falló: {e}")
+
+        # CV interno: seleccionar mejor distribución (logit vs probit)
+        best_distr, cv_info = cv_select_distribution(
+            X_train, y_train, n_classes, seed
+        )
+        print(
+            f"    CV interno (QWK): logit={cv_info['cv_qwk_logit_mean']:.3f}, "
+            f"probit={cv_info['cv_qwk_probit_mean']:.3f} -> {best_distr}"
+        )
+
+        # Entrenar modelo final en TODO el train, evaluar en test
+        y_pred, y_proba, res = fit_ordinal_single(
+            X_train, y_train, X_test, distr=best_distr
+        )
+
+        t_elapsed = time.perf_counter() - t_start
+
+        # Métricas
+        mets = eval_metrics(y_test, y_pred, y_proba, n_classes=n_classes)
+        mets["time_seconds"] = round(t_elapsed, 2)
+        per_seed_metrics.append(mets)
+
+        print(
+            f"    Test: acc={mets['accuracy']:.3f}, f1w={mets['f1_weighted']:.3f}, "
+            f"kappa={mets['kappa_qw']:.3f}, auc={mets['auc_ovr']:.3f}, "
+            f"time={t_elapsed:.1f}s"
+        )
+
+        # Guardar por seed
+        rows_seed_level.append(
+            {
+                "run_id": last_run.replace("run_", ""),
+                "model": "ordinal_logit",
+                "model_label": "Regresión logística ordinal",
+                "role_tesis": "Modelo interpretativo",
+                "seed": seed,
+                "target": tag,
+                "n_classes": n_classes,
+                "distribution": best_distr,
+                "n_train": int(len(y_train)),
+                "n_test": int(len(y_test)),
+                **mets,
+                **cv_info,
+            }
+        )
+
+        # Guardar artefactos SOLO para primer seed
+        if seed == SEEDS[0]:
+            cm = confusion_matrix(
+                y_test, y_pred, labels=list(range(1, n_classes + 1))
+            )
+            pd.DataFrame(cm).to_csv(
+                OUT_DIR / f"confusion_matrix_{tag}.csv",
+                index=False,
+                encoding="utf-8-sig",
+            )
+
+            cm_base = FIG_DIR / f"cm_{tag}_norm_true"
+            plot_confusion_matrix_norm(
+                cm,
+                labels=list(range(1, n_classes + 1)),
+                out_base=cm_base,
+                normalize="true"
+            )
+
+            report = classification_report(y_test, y_pred, zero_division=0)
+            (OUT_DIR / f"report_{tag}.txt").write_text(report, encoding="utf-8")
+
+            try:
+                (OUT_DIR / f"summary_{tag}.txt").write_text(
+                    res.summary().as_text(), encoding="utf-8"
+                )
+            except Exception:
+                (OUT_DIR / f"summary_{tag}.txt").write_text(
+                    "Summary unavailable (Hessian inversion failed)\n",
+                    encoding="utf-8",
+                )
+
+            params = res.params
+            try:
+                conf = res.conf_int()
+            except Exception:
+                conf = None
+
+            # params puede ser ndarray si Hessian falla; manejar ambos casos
+            if hasattr(params, 'index'):
+                term_names = params.index.tolist()
+                param_vals = params.values
+            else:
+                term_names = [f"x{i}" for i in range(len(params))]
+                param_vals = np.asarray(params)
+
+            coef_dict = {
+                "term": term_names,
+                "coef": param_vals,
+                "odds_ratio": np.exp(param_vals),
+            }
+            if conf is not None:
+                if hasattr(conf, 'values'):
+                    coef_dict["ci_low"] = conf.iloc[:, 0].values
+                    coef_dict["ci_high"] = conf.iloc[:, 1].values
+                else:
+                    coef_dict["ci_low"] = conf[:, 0]
+                    coef_dict["ci_high"] = conf[:, 1]
+                coef_dict["or_ci_low"] = np.exp(coef_dict["ci_low"])
+                coef_dict["or_ci_high"] = np.exp(coef_dict["ci_high"])
+
+            coef_df = pd.DataFrame(coef_dict)
+            coef_df.to_csv(
+                OUT_DIR / f"coefficients_{tag}.csv",
+                index=False,
+                encoding="utf-8-sig",
+            )
+
+            coef_tesis = coef_df.copy()
+
+            coef_tesis = coef_tesis[
+                ~coef_tesis["term"].astype(str).str.contains(
+                    "cut|threshold", case=False, regex=True, na=False
+                )
+            ].copy()
+
+            coef_tesis["variable"] = coef_tesis["term"]
+            coef_tesis["coef"] = coef_tesis["coef"].round(4)
+            coef_tesis["odds_ratio"] = coef_tesis["odds_ratio"].round(4)
+
+            if "or_ci_low" in coef_tesis.columns and "or_ci_high" in coef_tesis.columns:
+                coef_tesis["or_ci_low"] = coef_tesis["or_ci_low"].round(4)
+                coef_tesis["or_ci_high"] = coef_tesis["or_ci_high"].round(4)
+
+            coef_tesis.to_csv(
+                OUT_DIR / f"tabla_odds_ratio_tesis_{tag}.csv",
+                index=False,
+                encoding="utf-8-sig"
+            )
+            
+
+            coef_top = coef_df.copy()
+            coef_top = coef_top[
+                ~coef_top["term"].astype(str).str.contains("cut|threshold", case=False, regex=True, na=False)
+            ].copy()
+
+            coef_top["abs_log_or"] = np.abs(np.log(coef_top["odds_ratio"].clip(lower=1e-9)))
+            coef_top = coef_top.sort_values("abs_log_or", ascending=False).head(10)
+
+            coef_top.to_csv(
+                OUT_DIR / f"coefficients_top10_{tag}.csv",
+                index=False,
+                encoding="utf-8-sig"
+            )
+
+
+            or_base = FIG_DIR / f"or_top_{tag}"
+            plot_or_forest(coef_df, out_base=or_base, top_n=10)
+
+            pred_df = pd.DataFrame({"y_true": y_test.values, "y_pred": y_pred})
+            pred_df.to_csv(
+                OUT_DIR / f"predictions_{tag}.csv",
+                index=False,
+                encoding="utf-8-sig",
+            )
+
+    # Agregar resumen (promedio + std sobre seeds)
+    metric_keys = [
+        "accuracy",
+        "f1_weighted",
+        "f1_macro",
+        "mae_ordinal",
+        "kappa_qw",
+        "auc_ovr",
+        "time_seconds",
+    ]
+    agg = {}
+    for k in metric_keys:
+        vals = [d[k] for d in per_seed_metrics]
+        clean = [v for v in vals if not np.isnan(v)]
+        agg[f"{k}_mean"] = float(np.mean(clean)) if clean else float("nan")
+        agg[f"{k}_std"] = float(np.std(clean, ddof=0)) if clean else float("nan")
+
+    summary_row = {
+        "run_id": last_run.replace("run_", ""),
+        "model": "ordinal_logit",
+        "role_tesis": "Modelo interpretativo",
+        "interpretacion_tesis": "Modelo usado por la naturaleza ordinal de la variable dependiente; permite interpretar asociaciones mediante odds ratios.",
+        "target": tag,
+        "n_classes": n_classes,
+        "n_total": int(len(df)),
+        "n_features": int(X_enc.shape[1]),
+        "seeds": json.dumps(SEEDS),
+        "test_size": TEST_SIZE,
+        "n_splits_cv": N_SPLITS,
+        **agg,
+        "notes": f"mean over {len(SEEDS)} seeds, CV selects logit/probit",
+    }
+
+    print(
+        f"\n  Resumen {tag}: "
+        f"f1w={agg['f1_weighted_mean']:.3f} +/- {agg['f1_weighted_std']:.3f}, "
+        f"kappa={agg['kappa_qw_mean']:.3f}, auc={agg['auc_ovr_mean']:.3f}"
+    )
+
+    return summary_row
+
+
+# =========================
+# Ejecutar para 3 y 5 clases
+# =========================
+all_summaries = []
+
+if RUN_TARGET == "5":
+    summary = run_ordinal_multi_seed(
+        TARGET_5, n_classes=5, tag="ordinal_logit_5niveles"
+    )
+else:
+    summary = run_ordinal_multi_seed(
+        "confianza_3", n_classes=3, tag="ordinal_logit_3clases"
+    )
+
+all_summaries = [summary]
+
+
+# =========================
+# Save metrics (formato compatible con 03_modeling.py)
+# =========================
+df_seed = pd.DataFrame(rows_seed_level)
+df_seed.to_csv(OUT_DIR / "metrics_by_seed.csv", index=False, encoding="utf-8-sig")
+
+df_run = pd.DataFrame(all_summaries)
+df_run.to_csv(OUT_DIR / "metrics.csv", index=False, encoding="utf-8-sig")
+
+(OUT_DIR / "metrics.json").write_text(
+    df_run.to_json(orient="records", force_ascii=False, indent=2), encoding="utf-8"
+)
+
+ordinal_methodology = {
+    "modelo": "Regresión logística ordinal",
+    "tipo": "Modelo interpretativo",
+    "libreria": "statsmodels OrderedModel",
+    "target": RUN_TARGET,
+    "split": "70% entrenamiento / 30% validación",
+    "validacion": "5 semillas y validación cruzada interna para seleccionar logit/probit",
+    "metricas": [
+        "accuracy",
+        "f1_weighted",
+        "f1_macro",
+        "mae_ordinal",
+        "kappa_qw",
+        "auc_ovr"
+    ],
+    "supuesto_evaluado": "Proportional odds mediante chequeo exploratorio por umbrales",
+    "nota": "El modelo ordinal se usa como modelo interpretativo y no como único criterio predictivo."
+}
+
+(OUT_DIR / "ordinal_methodology_summary.json").write_text(
+    json.dumps(ordinal_methodology, ensure_ascii=False, indent=2),
+    encoding="utf-8"
+)
+
+print("\n" + "=" * 50)
+print("Ordinal completado.")
+print(f"  Metricas resumen: {OUT_DIR / 'metrics.csv'}")
+print(f"  Metricas por seed: {OUT_DIR / 'metrics_by_seed.csv'}")
+print(f"  Figuras: {FIG_DIR}")
+print("=" * 50)

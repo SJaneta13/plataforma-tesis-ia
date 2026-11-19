@@ -1,0 +1,10 @@
+﻿Real,Predicho,Cantidad,Modelo,Configuración
+Baja,Baja,45,SVM-RBF,3 niveles
+Baja,Media,10,SVM-RBF,3 niveles
+Baja,Alta,18,SVM-RBF,3 niveles
+Media,Baja,26,SVM-RBF,3 niveles
+Media,Media,16,SVM-RBF,3 niveles
+Media,Alta,8,SVM-RBF,3 niveles
+Alta,Baja,25,SVM-RBF,3 niveles
+Alta,Media,7,SVM-RBF,3 niveles
+Alta,Alta,18,SVM-RBF,3 niveles

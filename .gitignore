@@ -1,0 +1,16 @@
+# Entornos y archivos locales
+.venv*/
+venv*/
+__pycache__/
+*.py[cod]
+*.log
+.env
+.env.*
+.streamlit/secrets.toml
+.vscode/
+.DS_Store
+Thumbs.db
+data/raw/
+data/external/
+cookies_*.json
+.ipynb_checkpoints/

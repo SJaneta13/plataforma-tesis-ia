@@ -1,0 +1,26 @@
+﻿Real,Predicho,Cantidad,Modelo,Configuración
+Muy baja,Muy baja,6,Random Forest,5 niveles
+Muy baja,Baja,1,Random Forest,5 niveles
+Muy baja,Media,3,Random Forest,5 niveles
+Muy baja,Alta,1,Random Forest,5 niveles
+Muy baja,Muy alta,0,Random Forest,5 niveles
+Baja,Muy baja,2,Random Forest,5 niveles
+Baja,Baja,32,Random Forest,5 niveles
+Baja,Media,13,Random Forest,5 niveles
+Baja,Alta,14,Random Forest,5 niveles
+Baja,Muy alta,1,Random Forest,5 niveles
+Media,Muy baja,0,Random Forest,5 niveles
+Media,Baja,19,Random Forest,5 niveles
+Media,Media,22,Random Forest,5 niveles
+Media,Alta,9,Random Forest,5 niveles
+Media,Muy alta,0,Random Forest,5 niveles
+Alta,Muy baja,0,Random Forest,5 niveles
+Alta,Baja,21,Random Forest,5 niveles
+Alta,Media,11,Random Forest,5 niveles
+Alta,Alta,14,Random Forest,5 niveles
+Alta,Muy alta,0,Random Forest,5 niveles
+Muy alta,Muy baja,0,Random Forest,5 niveles
+Muy alta,Baja,2,Random Forest,5 niveles
+Muy alta,Media,0,Random Forest,5 niveles
+Muy alta,Alta,2,Random Forest,5 niveles
+Muy alta,Muy alta,0,Random Forest,5 niveles

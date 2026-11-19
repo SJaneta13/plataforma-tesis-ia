@@ -1,0 +1,20 @@
+{
+  "mode": "complete",
+  "run_5": "run_20260721_014333_target5_complete",
+  "run_3": "run_20260721_201825_target3_complete",
+  "run_5_sensitivity": "run_20260721_061847_target5_sensitivity",
+  "run_3_sensitivity": "run_20260721_210104_target3_sensitivity",
+  "main_model_5": "random_forest",
+  "best_model_3": "svm_rbf",
+  "academic_models": [
+    "random_forest",
+    "svm_rbf",
+    "ordinal_logit"
+  ],
+  "sensitivity_artifact": "model_sensitivity_comparison.csv",
+  "feature_importance_method": "permutation_importance",
+  "feature_importance_scoring": "f1_weighted",
+  "feature_importance_repeats": 20,
+  "feature_importance_test_seed": 0,
+  "data": "data\\processed\\encuestas\\model_ready_no_text.csv"
+}

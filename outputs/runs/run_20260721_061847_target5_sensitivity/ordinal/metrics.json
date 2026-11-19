@@ -1,0 +1,30 @@
+[
+  {
+    "run_id":"20260721_061847_target5_sensitivity",
+    "model":"ordinal_logit",
+    "role_tesis":"Modelo interpretativo",
+    "interpretacion_tesis":"Modelo usado por la naturaleza ordinal de la variable dependiente; permite interpretar asociaciones mediante odds ratios.",
+    "target":"ordinal_logit_5niveles",
+    "n_classes":5,
+    "n_total":575,
+    "n_features":30,
+    "seeds":"[0, 7, 13, 21, 42]",
+    "test_size":0.3,
+    "n_splits_cv":5,
+    "accuracy_mean":0.3572254335,
+    "accuracy_std":0.0067409848,
+    "f1_weighted_mean":0.3080248376,
+    "f1_weighted_std":0.0126393099,
+    "f1_macro_mean":0.1941697047,
+    "f1_macro_std":0.0084726084,
+    "mae_ordinal_mean":0.8924855491,
+    "mae_ordinal_std":0.0232941522,
+    "kappa_qw_mean":0.1840984782,
+    "kappa_qw_std":0.0408137029,
+    "auc_ovr_mean":0.5592814658,
+    "auc_ovr_std":0.0144106741,
+    "time_seconds_mean":35.082,
+    "time_seconds_std":1.4779093342,
+    "notes":"mean over 5 seeds, CV selects logit\/probit"
+  }
+]
